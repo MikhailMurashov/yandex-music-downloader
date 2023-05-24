@@ -125,6 +125,13 @@ export type Track = {
   readonly batchId: string;
 };
 
+export type TrackCredits = {
+  readonly performers: string;
+  readonly lyricists: string;
+  readonly composers: string;
+  readonly soundtrack_source: string;
+}
+
 export type Album = {
   readonly id: number;
   readonly title: string;

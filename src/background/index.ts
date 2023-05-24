@@ -333,6 +333,9 @@ export class BackgroundApiService {
     for (const track of playlist.tracks) {
       try {
         if (!track.available) continue;
+
+        const trackCredits = await this.yandexMusicApi.getTrackCredits(track.id);
+
         const downloadUrl = await this.yandexMusicApi.getTrackDownloadLink(
           +track.id
         );
