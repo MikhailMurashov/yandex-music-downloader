@@ -9,6 +9,7 @@ import {TrackID3TagWriter} from './services/id3-tag-writer';
 import {UserSettings} from './services/user-settings';
 
 import {ChromeMessageType, ChromeMessage} from './interfaces';
+import { ExportToCsv } from 'export-to-csv';
 
 type ErrorCallback = (err: Error) => void;
 
@@ -329,12 +330,11 @@ export class BackgroundApiService {
   async downloadPlaylist(owner: string | number, kind: number): Promise<void> {
     /* get playlist info */
     const {playlist} = await this.yandexMusicApi.getPlaylist(owner, kind);
+    const creditsRows: {[key: string]: string}[] = []
 
     for (const track of playlist.tracks) {
       try {
         if (!track.available) continue;
-
-        const trackCredits = await this.yandexMusicApi.getTrackCredits(track.id);
 
         const downloadUrl = await this.yandexMusicApi.getTrackDownloadLink(
           +track.id
@@ -345,7 +345,16 @@ export class BackgroundApiService {
           track.title,
           track.albums.length > 0 ? track.albums[0].title : '',
           track.artists.length > 0 ? track.artists[0].name : ''
-        );
+        ) + '.mp3';
+
+        const {credits} = await this.yandexMusicApi.getTrack(track.id);
+        const trackCredits = credits.reduce((obj, item) => {
+          obj[item.title] = item.value;
+          return obj;
+        }, {} as {[key: string]: string})
+
+        trackCredits['filename'] = filename
+        creditsRows.push(trackCredits)
 
         let path = BackgroundApiService.userSettings.downloadPath;
         if (
@@ -357,7 +366,7 @@ export class BackgroundApiService {
         BackgroundApiService.downloadManager.download(
           downloadUrl,
           track.title,
-          filename + '.mp3',
+          filename,
           path,
           {trackId: track.id, locale: this.yandexMusicApi.getLocale()}
         );
@@ -365,6 +374,12 @@ export class BackgroundApiService {
         BackgroundApiService.emitError_(err);
       }
     }
+    const options = { 
+      filename: 'credits',
+      useKeysAsHeaders: true,
+    };
+    const csvExporter = new ExportToCsv(options);
+    csvExporter.generateCsv(creditsRows);
   }
   /**
    * Downloads all songs of provided artist

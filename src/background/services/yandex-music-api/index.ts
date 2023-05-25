@@ -107,6 +107,7 @@ export class YandexMusicAPI implements IYandexMusicAPI {
     readonly similarTracks: Track[];
     readonly track: Track;
     readonly lyric: Lyric[];
+    readonly credits: TrackCredits[];
   }> {
     return await this.getObject(
       `${this.getHostname()}/handlers/track.jsx?track=${trackId}`
@@ -192,13 +193,5 @@ export class YandexMusicAPI implements IYandexMusicAPI {
    */
   getLocale(): string {
     return this.locale_;
-  }
-  /**
-   * @return track credits info from '/handlers/track.jsx'
-   */
-  async getTrackCredits(trackId: number): Promise<{trackCredits: TrackCredits}> {
-    return await this.getObject(
-      `${this.getHostname()}/handlers/track.jsx?track=${trackId}`
-    );
   }
 }
