@@ -126,10 +126,8 @@ export type Track = {
 };
 
 export type TrackCredits = {
-  readonly performers: string;
-  readonly lyricists: string;
-  readonly composers: string;
-  readonly soundtrack_source: string;
+  readonly title: string;
+  readonly value: string;
 }
 
 export type Album = {
