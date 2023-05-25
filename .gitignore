@@ -14,8 +14,9 @@ node_modules
 # Coverage directory used by tools like istanbul
 coverage
 
-#build directory
+# build directory and files
 build
+*.crx
 
 # visual studio code settings
 .vscode
