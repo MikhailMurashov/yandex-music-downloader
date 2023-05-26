@@ -185,8 +185,7 @@ export class BackgroundApiService {
         const trackBuffer = tagWriter.getTrack();
         this.zip.file(item.filename, trackBuffer);
 
-        console.log(this.downloadManager.queue_length());
-        if (this.downloadManager.queue_length() === 0) {
+        if (this.downloadManager.queueLength() === 0) {
           const csvFile = this.createCSV_(this.tracksCreditsRows);
           this.zip.file('credits.csv', csvFile);
 
@@ -239,10 +238,8 @@ export class BackgroundApiService {
       headers.forEach(header => {
         row.push(credits[header]);
       });
-      console.log(row);
       stringRows.push(row.join(separator));
     });
-    console.log(stringRows);
 
     const CSV = stringRows.join('\n');
     return new Blob([CSV], {type: 'text/csv'});
