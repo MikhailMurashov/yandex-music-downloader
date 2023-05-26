@@ -174,11 +174,10 @@ export class BackgroundApiService {
         }
 
         /* add credits */
-        const trackCredits = track.credits.reduce((obj, item) => {
-          obj[item.title] = item.value;
-          return obj;
-        }, {} as {[key: string]: string});
-        trackCredits['filename'] = item.filename;
+        const trackCredits = this.getDictFromCredits_(
+          track.credits,
+          item.filename
+        );
         this.tracksCreditsRows.push(trackCredits);
 
         /* add track to zip */
@@ -216,6 +215,20 @@ export class BackgroundApiService {
     } catch (err) {
       BackgroundApiService.emitError_(err);
     }
+  }
+  /**
+   * create CSV for credits from list
+   */
+  private static getDictFromCredits_(
+    creditsList: {[key: string]: string}[],
+    fileName: string
+  ): {[key: string]: string} {
+    const trackCredits = creditsList.reduce((obj, item) => {
+      obj[item.title] = item.value;
+      return obj;
+    }, {} as {[key: string]: string});
+    trackCredits['filename'] = fileName;
+    return trackCredits;
   }
   /**
    * create CSV for credits from list
