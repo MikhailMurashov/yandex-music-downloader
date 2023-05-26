@@ -17,6 +17,7 @@ coverage
 # build directory and files
 build
 *.crx
+*.pem
 
 # visual studio code settings
 .vscode

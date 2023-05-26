@@ -155,7 +155,6 @@ export class DownloadManager implements IDownloadManager {
       startMs: -1 /* timestamp in ms */,
       customData,
     };
-
     this.downloadQueue_.push(downloadItem);
 
     this.emit_('add', downloadItem);
@@ -195,7 +194,7 @@ export class DownloadManager implements IDownloadManager {
    */
   run(): void {
     this.queuePaused_ = false;
-    this.queueProcessNext_();
+    // this.queueProcessNext_();
   }
   /**
    * Stops queue execution. Doen't stop downloads in progress.
@@ -218,6 +217,12 @@ export class DownloadManager implements IDownloadManager {
    */
   list(): DownloadItem[] {
     return this.downloadQueue_;
+  }
+  /**
+   * @return current len of list of download items
+   */
+  queue_length(): number {
+    return this.downloadQueue_.length;
   }
   /**
    * @return current size of queue

@@ -9,7 +9,8 @@ import {TrackID3TagWriter} from './services/id3-tag-writer';
 import {UserSettings} from './services/user-settings';
 
 import {ChromeMessageType, ChromeMessage} from './interfaces';
-import { ExportToCsv } from 'export-to-csv';
+import JSZip from 'jszip';
+import {saveAs} from 'file-saver';
 
 type ErrorCallback = (err: Error) => void;
 
@@ -18,6 +19,11 @@ export class BackgroundApiService {
 
   static userSettings: UserSettings;
   static downloadManager: DownloadManager;
+
+  private static tracksCreditsRows: {[key: string]: string}[] = [];
+  private static zip: JSZip | undefined;
+  private static zipName: string;
+  private static isSavingPlaylist = false;
 
   private static errorListeners_: ErrorCallback[] = [];
   private static completeEventCallback_: (
@@ -162,24 +168,84 @@ export class BackgroundApiService {
         );
       }
 
-      const trackUrl = tagWriter.getUrl();
+      if (this.isSavingPlaylist) {
+        if (this.zip === undefined) {
+          this.zip = new JSZip();
+        }
 
-      /* save to chrome */
-      return new Promise<void>(resolve => {
-        chrome.downloads.download(
-          {
-            url: trackUrl,
-            filename: item.downloadPath + item.filename,
-          },
-          () => {
-            tagWriter.revokeUrl();
-            resolve();
-          }
-        );
-      });
+        /* add credits */
+        const trackCredits = track.credits.reduce((obj, item) => {
+          obj[item.title] = item.value;
+          return obj;
+        }, {} as {[key: string]: string});
+        trackCredits['filename'] = item.filename;
+        this.tracksCreditsRows.push(trackCredits);
+
+        /* add track to zip */
+        const trackBuffer = tagWriter.getTrack();
+        this.zip.file(item.filename, trackBuffer);
+
+        console.log(this.downloadManager.queue_length());
+        if (this.downloadManager.queue_length() === 0) {
+          const csvFile = this.createCSV_(this.tracksCreditsRows);
+          this.zip.file('credits.csv', csvFile);
+
+          await this.zip.generateAsync({type: 'blob'}).then(content => {
+            saveAs(content, this.zipName);
+          });
+
+          this.tracksCreditsRows = [];
+          this.zip = undefined;
+          this.isSavingPlaylist = false;
+        }
+      } else {
+        /* save to chrome */
+        const trackURL = tagWriter.getUrl();
+        return new Promise<void>(resolve => {
+          chrome.downloads.download(
+            {
+              url: trackURL,
+              filename: item.downloadPath + item.filename,
+            },
+            () => {
+              tagWriter.revokeUrl();
+              resolve();
+            }
+          );
+        });
+      }
     } catch (err) {
       BackgroundApiService.emitError_(err);
     }
+  }
+  /**
+   * create CSV for credits from list
+   */
+  private static createCSV_(trackCredits: {[key: string]: string}[]): Blob {
+    const separator = ';';
+    const stringRows = [] as string[];
+    const headers = [
+      'filename',
+      'Автор музыки',
+      'Автор текста',
+      'Исполнитель',
+      'Источник фонограммы',
+      'Лейбл',
+    ];
+    stringRows.push(headers.join(separator));
+
+    trackCredits.forEach(credits => {
+      const row = [] as string[];
+      headers.forEach(header => {
+        row.push(credits[header]);
+      });
+      console.log(row);
+      stringRows.push(row.join(separator));
+    });
+    console.log(stringRows);
+
+    const CSV = stringRows.join('\n');
+    return new Blob([CSV], {type: 'text/csv'});
   }
   /**
    * Encodes file to filesystem friendly format by escaping banned symbols
@@ -330,12 +396,12 @@ export class BackgroundApiService {
   async downloadPlaylist(owner: string | number, kind: number): Promise<void> {
     /* get playlist info */
     const {playlist} = await this.yandexMusicApi.getPlaylist(owner, kind);
-    const creditsRows: {[key: string]: string}[] = []
+    BackgroundApiService.zipName = playlist.title;
+    BackgroundApiService.isSavingPlaylist = true;
 
     for (const track of playlist.tracks) {
       try {
         if (!track.available) continue;
-
         const downloadUrl = await this.yandexMusicApi.getTrackDownloadLink(
           +track.id
         );
@@ -345,16 +411,7 @@ export class BackgroundApiService {
           track.title,
           track.albums.length > 0 ? track.albums[0].title : '',
           track.artists.length > 0 ? track.artists[0].name : ''
-        ) + '.mp3';
-
-        const {credits} = await this.yandexMusicApi.getTrack(track.id);
-        const trackCredits = credits.reduce((obj, item) => {
-          obj[item.title] = item.value;
-          return obj;
-        }, {} as {[key: string]: string})
-
-        trackCredits['filename'] = filename
-        creditsRows.push(trackCredits)
+        );
 
         let path = BackgroundApiService.userSettings.downloadPath;
         if (
@@ -366,7 +423,7 @@ export class BackgroundApiService {
         BackgroundApiService.downloadManager.download(
           downloadUrl,
           track.title,
-          filename,
+          filename + '.mp3',
           path,
           {trackId: track.id, locale: this.yandexMusicApi.getLocale()}
         );
@@ -374,12 +431,6 @@ export class BackgroundApiService {
         BackgroundApiService.emitError_(err);
       }
     }
-    const options = { 
-      filename: 'credits',
-      useKeysAsHeaders: true,
-    };
-    const csvExporter = new ExportToCsv(options);
-    csvExporter.generateCsv(creditsRows);
   }
   /**
    * Downloads all songs of provided artist
